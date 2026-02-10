@@ -151,6 +151,8 @@ async function getAIResponse(prompt: string): Promise<Array<{
     presence_penalty: 0,
   };
 
+  let rawResponse = "";
+  
   try {
     const response = await openai.chat.completions.create({
       ...queryConfig,
@@ -166,18 +168,19 @@ async function getAIResponse(prompt: string): Promise<Array<{
       ],
     });
 
-    const res = response.choices[0].message?.content?.trim() || "{}";
+    rawResponse = response.choices[0].message?.content?.trim() || "{}";
     
     // Strip markdown code blocks if present (e.g., ```json\n{...}\n```)
-    const jsonString = res.replace(/^```(?:json)?\s*\n?/i, '').replace(/\n?```\s*$/i, '');
+    const jsonString = rawResponse.replace(/^```(?:json)?\s*\n?/i, '').replace(/\n?```\s*$/i, '');
     
     return JSON.parse(jsonString).reviews;
   } catch (error) {
     console.error("Error:", error);
     
     // Log the actual response that failed to parse for debugging
-    const res = response.choices[0].message?.content?.trim() || "{}";
-    core.error(`Failed to parse AI response. Raw content: ${res}`);
+    if (rawResponse) {
+      core.error(`Failed to parse AI response. Raw content: ${rawResponse}`);
+    }
     
     return null;
   }
