@@ -1,4 +1,5 @@
-import { readFileSync } from "fs";
+import { readFileSync, existsSync } from "fs";
+import { resolve } from "path";
 import * as core from "@actions/core";
 import OpenAI from "openai";
 import { Octokit } from "@octokit/rest";
@@ -8,6 +9,7 @@ import minimatch from "minimatch";
 const GITHUB_TOKEN: string = core.getInput("GITHUB_TOKEN");
 const OPENAI_API_KEY: string = core.getInput("OPENAI_API_KEY");
 const OPENAI_API_MODEL: string = core.getInput("OPENAI_API_MODEL");
+const RULES_FILE: string = core.getInput("RULES_FILE");
 
 const octokit = new Octokit({ auth: GITHUB_TOKEN });
 
@@ -41,6 +43,27 @@ async function getPRDetails(): Promise<PRDetails> {
   };
 }
 
+function getCustomRules(): string | null {
+  if (!RULES_FILE) {
+    return null;
+  }
+
+  try {
+    const rulesPath = resolve(process.cwd(), RULES_FILE);
+    if (existsSync(rulesPath)) {
+      const rulesContent = readFileSync(rulesPath, "utf8");
+      core.info(`Loaded custom rules from: ${RULES_FILE}`);
+      return rulesContent.trim();
+    } else {
+      core.warning(`Rules file not found: ${RULES_FILE}`);
+      return null;
+    }
+  } catch (error) {
+    core.warning(`Error reading rules file: ${error}`);
+    return null;
+  }
+}
+
 async function getDiff(
   owner: string,
   repo: string,
@@ -58,14 +81,15 @@ async function getDiff(
 
 async function analyzeCode(
   parsedDiff: File[],
-  prDetails: PRDetails
+  prDetails: PRDetails,
+  customRules: string | null
 ): Promise<Array<{ body: string; path: string; line: number }>> {
   const comments: Array<{ body: string; path: string; line: number }> = [];
 
   for (const file of parsedDiff) {
     if (file.to === "/dev/null") continue; // Ignore deleted files
     for (const chunk of file.chunks) {
-      const prompt = createPrompt(file, chunk, prDetails);
+      const prompt = createPrompt(file, chunk, prDetails, customRules);
       const aiResponse = await getAIResponse(prompt);
       if (aiResponse) {
         const newComments = createComment(file, chunk, aiResponse);
@@ -78,14 +102,18 @@ async function analyzeCode(
   return comments;
 }
 
-function createPrompt(file: File, chunk: Chunk, prDetails: PRDetails): string {
+function createPrompt(file: File, chunk: Chunk, prDetails: PRDetails, customRules: string | null): string {
+  const customRulesSection = customRules
+    ? `\n\nCustom Review Rules:\n---\n${customRules}\n---\n`
+    : '';
+
   return `Your task is to review pull requests. Instructions:
 - Provide the response in following JSON format:  {"reviews": [{"lineNumber":  <line_number>, "reviewComment": "<review comment>"}]}
 - Do not give positive comments or compliments.
 - Provide comments and suggestions ONLY if there is something to improve, otherwise "reviews" should be an empty array.
 - Write the comment in GitHub Markdown format.
 - Use the given description only for the overall context and only comment the code.
-- IMPORTANT: NEVER suggest adding comments to the code.
+- IMPORTANT: NEVER suggest adding comments to the code.${customRulesSection}
 
 Review the following code diff in the file "${
     file.to
@@ -183,6 +211,7 @@ async function createReviewComment(
 
 async function main() {
   const prDetails = await getPRDetails();
+  const customRules = getCustomRules();
   let diff: string | null;
   const eventData = JSON.parse(
     readFileSync(process.env.GITHUB_EVENT_PATH ?? "", "utf8")
@@ -232,7 +261,7 @@ async function main() {
     );
   });
 
-  const comments = await analyzeCode(filteredDiff, prDetails);
+  const comments = await analyzeCode(filteredDiff, prDetails, customRules);
   if (comments.length > 0) {
     await createReviewComment(
       prDetails.owner,

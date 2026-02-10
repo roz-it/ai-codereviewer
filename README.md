@@ -44,6 +44,7 @@ jobs:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           OPENAI_API_MODEL: "gpt-4" # Optional: defaults to "gpt-4"
           exclude: "**/*.json, **/*.md" # Optional: exclude patterns separated by commas
+          RULES_FILE: ".github/review-rules.txt" # Optional: path to custom review rules file
 ```
 
 4. Replace `your-username` with your GitHub username or organization name where the AI Code Reviewer repository is
@@ -51,12 +52,32 @@ jobs:
 
 5. Customize the `exclude` input if you want to ignore certain file patterns from being reviewed.
 
-6. Commit the changes to your repository, and AI Code Reviewer will start working on your future pull requests.
+6. Optionally, create a custom rules file (e.g., `.github/review-rules.txt`) to provide project-specific review guidelines:
+
+```txt
+- Focus on security vulnerabilities and potential bugs
+- Check for proper error handling
+- Ensure code follows our team's naming conventions
+- Verify that new functions have appropriate input validation
+```
+
+7. Commit the changes to your repository, and AI Code Reviewer will start working on your future pull requests.
 
 ## How It Works
 
 The AI Code Reviewer GitHub Action retrieves the pull request diff, filters out excluded files, and sends code chunks to
 the OpenAI API. It then generates review comments based on the AI's response and adds them to the pull request.
+
+## Custom Review Rules
+
+You can provide custom review rules by creating a rules file in your repository and specifying its path with the `RULES_FILE` input parameter. This allows you to:
+
+- Define project-specific coding standards
+- Focus reviews on particular aspects (security, performance, etc.)
+- Enforce team conventions and best practices
+- Customize the review behavior for different repositories
+
+The custom rules will be injected into the AI prompt, guiding the review process according to your specifications.
 
 ## Contributing
 
