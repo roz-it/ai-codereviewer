@@ -110,6 +110,12 @@ function createPrompt(file: File, chunk: Chunk, prDetails: PRDetails, customRule
   return `Your task is to review pull requests. Instructions:
 - Provide the response in following JSON format:  {"reviews": [{"lineNumber":  <line_number>, "reviewComment": "<review comment>"}]}
 - Do not give positive comments or compliments.
+- Focus on security vulnerabilities and potential bugs
+- Be sure to call out any reasonable concerns about exposing PII or passwords, keys, or other credentials (including password hashes).
+- Evaluate changes against common OWASP Top 10 risks and secure coding best practices relevant to the stack.
+- Call out unsafe handling of user input, query construction, file uploads, deserialization, or external network calls.
+- Flag hardcoded configuration values, debug flags, disabled security controls, or insecure security defaults.
+- Identify logging of sensitive data or excessive error detail that could leak internal system information.
 - Provide comments and suggestions ONLY if there is something to improve, otherwise "reviews" should be an empty array.
 - Write the comment in GitHub Markdown format.
 - Use the given description only for the overall context and only comment the code.
